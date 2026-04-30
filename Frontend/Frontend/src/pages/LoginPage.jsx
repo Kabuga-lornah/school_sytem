@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import Card from '../components/Card'
 import ThemeToggle from '../components/ThemeToggle'
@@ -38,14 +38,16 @@ function LoginPage() {
     try {
       setSubmitting(true)
       setError('')
-      const data = await loginUser(form)
-      localStorage.setItem('selected_role', role)
-      localStorage.setItem('role', role)
+      const data = await loginUser({ ...form, role })
+      const actualRole = data.role
+      const actualRoleConfig = getRoleConfig(actualRole)
+      localStorage.setItem('selected_role', actualRole)
+      localStorage.setItem('role', actualRole)
       localStorage.setItem('access_token', data.access)
       localStorage.setItem('refresh_token', data.refresh)
-      localStorage.setItem('user_name', form.username)
+      localStorage.setItem('user_name', data.display_name || data.username || form.username)
       window.dispatchEvent(new Event('auth-user-updated'))
-      navigate(roleConfig.dashboardPath)
+      navigate(actualRoleConfig?.dashboardPath || '/')
     } catch (requestError) {
       setError(requestError.response?.data?.detail || 'Login failed. Check your credentials and try again.')
     } finally {
@@ -102,6 +104,15 @@ function LoginPage() {
               Back to role selection
             </button>
           </div>
+
+          {role !== 'admin' ? (
+            <p className="auth-redirect-text">
+              Have not yet activated your account?{' '}
+              <Link to={`/activate?role=${role}`} className="auth-redirect-link">
+                Activate here
+              </Link>
+            </p>
+          ) : null}
         </form>
       </Card>
     </div>

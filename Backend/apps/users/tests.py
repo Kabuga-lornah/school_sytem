@@ -66,7 +66,7 @@ class ParentDashboardAPITests(APITestCase):
     def authenticate_with_jwt(self):
         login_response = self.client.post(
             reverse("token_obtain_pair"),
-            {"username": "parent1", "password": "testpass123"},
+            {"username": "parent1", "password": "testpass123", "role": "parent"},
             format="json",
         )
 
@@ -80,12 +80,23 @@ class ParentDashboardAPITests(APITestCase):
     def test_valid_login_returns_tokens(self):
         response = self.client.post(
             reverse("token_obtain_pair"),
-            {"username": "parent1", "password": "testpass123"},
+            {"username": "parent1", "password": "testpass123", "role": "parent"},
             format="json",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("access", response.data)
+        self.assertEqual(response.data["role"], "parent")
+
+    def test_login_rejects_wrong_role_portal(self):
+        response = self.client.post(
+            reverse("token_obtain_pair"),
+            {"username": "parent1", "password": "testpass123", "role": "admin"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("correct login page", str(response.data["detail"]))
 
     def test_school_admin_can_register_school(self):
         response = self.client.post(
@@ -114,6 +125,7 @@ class ParentDashboardAPITests(APITestCase):
             password="temp-pass-123",
             role="parent",
             school=self.school,
+            must_change_password=True,
         )
 
         response = self.client.post(
@@ -130,7 +142,173 @@ class ParentDashboardAPITests(APITestCase):
         self.assertEqual(response.status_code, 200)
         invited_parent.refresh_from_db()
         self.assertTrue(invited_parent.check_password("new-pass-123"))
+        self.assertFalse(invited_parent.must_change_password)
         self.assertEqual(response.data["detail"], "Account activated successfully.")
+
+    def test_school_admin_can_invite_teacher(self):
+        admin_user = User.objects.create_user(
+            username="admin1",
+            email="admin1@example.com",
+            password="adminpass123",
+            role="admin",
+            school=self.school,
+        )
+        self.client.force_authenticate(user=admin_user)
+
+        response = self.client.post(
+            reverse("admin-teacher-invites"),
+            {
+                "email": "teacher1@example.com",
+                "phone": "0711111111",
+                "first_name": "Jane",
+                "last_name": "Teacher",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["teacher"]["first_name"], "Jane")
+        self.assertEqual(response.data["teacher"]["role"], "teacher")
+        self.assertTrue(response.data["teacher"]["must_change_password"])
+        self.assertTrue(response.data["teacher"]["is_approved"])
+        self.assertEqual(response.data["activation_key"], "janekingsacademy")
+        invited_teacher = User.objects.get(email="teacher1@example.com")
+        self.assertTrue(invited_teacher.check_password(response.data["activation_key"]))
+        self.assertTrue(invited_teacher.username.startswith("pending-"))
+
+    def test_teacher_can_invite_colleague_but_admin_must_approve_first(self):
+        teacher_user = User.objects.create_user(
+            username="teacher2",
+            email="teacher2@example.com",
+            password="teacherpass123",
+            role="teacher",
+            school=self.school,
+            is_approved=True,
+        )
+        self.client.force_authenticate(user=teacher_user)
+
+        invite_response = self.client.post(
+            reverse("admin-teacher-invites"),
+            {
+                "email": "teacher4@example.com",
+                "phone": "0744444444",
+                "first_name": "Martha",
+                "last_name": "Colleague",
+            },
+            format="json",
+        )
+
+        self.assertEqual(invite_response.status_code, 201)
+        self.assertFalse(invite_response.data["teacher"]["is_approved"])
+
+        invited_teacher = User.objects.get(email="teacher4@example.com")
+        activation_response = self.client.post(
+            reverse("activate-account"),
+            {
+                "school_code": self.school.school_code,
+                "identifier": "teacher4@example.com",
+                "temporary_password": "marthakingsacademy",
+                "username": "teacher4",
+                "new_password": "new-pass-789",
+            },
+            format="json",
+        )
+
+        self.assertEqual(activation_response.status_code, 400)
+        self.assertEqual(activation_response.data["detail"], "This teacher account is waiting for admin approval.")
+
+        admin_user = User.objects.create_user(
+            username="admin2",
+            email="admin2@example.com",
+            password="adminpass123",
+            role="admin",
+            school=self.school,
+        )
+        self.client.force_authenticate(user=admin_user)
+        approve_response = self.client.post(reverse("approve-teacher", kwargs={"teacher_id": invited_teacher.id}))
+
+        self.assertEqual(approve_response.status_code, 200)
+        invited_teacher.refresh_from_db()
+        self.assertTrue(invited_teacher.is_approved)
+
+    def test_invited_teacher_can_choose_username_during_activation(self):
+        invited_teacher = User.objects.create_user(
+            username="pending-teacher3",
+            email="Teacher3@example.com",
+            phone="0733333333",
+            password="janekingsacademy",
+            role="teacher",
+            school=self.school,
+            first_name="Jane",
+            last_name="Tutor",
+            must_change_password=True,
+            is_approved=True,
+        )
+
+        response = self.client.post(
+            reverse("activate-account"),
+            {
+                "school_code": self.school.school_code,
+                "identifier": "teacher3@example.com",
+                "temporary_password": "janekingsacademy",
+                "username": "teacher3",
+                "new_password": "new-pass-456",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        invited_teacher.refresh_from_db()
+        self.assertEqual(invited_teacher.username, "teacher3")
+        self.assertTrue(invited_teacher.check_password("new-pass-456"))
+        self.assertFalse(invited_teacher.must_change_password)
+
+    def test_teacher_can_invite_parent_and_create_student_record(self):
+        teacher_user = User.objects.create_user(
+            username="teacher2",
+            email="teacher2@example.com",
+            password="teacherpass123",
+            role="teacher",
+            school=self.school,
+        )
+        self.client.force_authenticate(user=teacher_user)
+
+        response = self.client.post(
+            reverse("school-parent-invites"),
+            {
+                "parent_email": "parent2@example.com",
+                "parent_phone": "0722222222",
+                "parent_first_name": "Peter",
+                "parent_last_name": "Parent",
+                "learners": [
+                    {
+                        "student_first_name": "Mary",
+                        "student_last_name": "Learner",
+                        "admission_number": "ADM002",
+                        "date_of_birth": "2015-05-01",
+                        "class_name": "Grade 5",
+                        "class_stream": "North",
+                    },
+                    {
+                        "student_first_name": "Mark",
+                        "student_last_name": "Learner",
+                        "admission_number": "ADM003",
+                        "date_of_birth": "2013-03-15",
+                        "class_name": "Grade 7",
+                        "class_stream": "West",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["parent"]["username"], "peter")
+        self.assertEqual(len(response.data["students"]), 2)
+        self.assertEqual(response.data["students"][0]["admission_number"], "ADM002")
+        self.assertEqual(response.data["students"][0]["class_name"], "Grade 5 North")
+        self.assertEqual(response.data["students"][1]["admission_number"], "ADM003")
+        self.assertTrue(User.objects.get(username="peter").must_change_password)
 
     def test_parent_dashboard_returns_401_without_authentication(self):
         response = self.client.get(reverse("parent-dashboard"))

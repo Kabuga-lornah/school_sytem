@@ -16,6 +16,7 @@ function ActivateAccountPage() {
     school_code: '',
     identifier: '',
     temporary_password: '',
+    username: '',
     new_password: '',
   })
   const [error, setError] = useState('')
@@ -59,7 +60,9 @@ function ActivateAccountPage() {
       </div>
       <Card
         title={`Activate ${roleConfig.label} Account`}
-        subtitle="Use the school code and temporary credentials provided by the school admin."
+        subtitle={role === 'teacher'
+          ? 'Use your school code, email or phone number, and activation key. You will choose your username during setup.'
+          : 'Use the school code and temporary credentials provided by the school admin.'}
       >
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
@@ -67,13 +70,19 @@ function ActivateAccountPage() {
             <input value={form.school_code} onChange={(e) => setForm((c) => ({ ...c, school_code: e.target.value }))} />
           </label>
           <label className="auth-field">
-            <span>Username or email</span>
+            <span>{role === 'teacher' ? 'Email or phone number' : 'Username or email'}</span>
             <input value={form.identifier} onChange={(e) => setForm((c) => ({ ...c, identifier: e.target.value }))} />
           </label>
           <label className="auth-field">
-            <span>Temporary password</span>
+            <span>{role === 'teacher' ? 'Activation key' : 'Temporary password'}</span>
             <input type="password" value={form.temporary_password} onChange={(e) => setForm((c) => ({ ...c, temporary_password: e.target.value }))} />
           </label>
+          {role === 'teacher' ? (
+            <label className="auth-field">
+              <span>Choose username</span>
+              <input value={form.username} onChange={(e) => setForm((c) => ({ ...c, username: e.target.value }))} />
+            </label>
+          ) : null}
           <label className="auth-field">
             <span>New password</span>
             <input type="password" value={form.new_password} onChange={(e) => setForm((c) => ({ ...c, new_password: e.target.value }))} />

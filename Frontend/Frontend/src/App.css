@@ -20,6 +20,42 @@
   gap: 1rem;
 }
 
+.dashboard-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.family-section-header,
+.family-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.family-section-header {
+  margin-top: 0.5rem;
+}
+
+.family-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.family-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.button-inline {
+  padding: 0.55rem 0.85rem;
+  box-shadow: none;
+}
+
 .student-meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -64,6 +100,13 @@
   background: var(--panel-soft);
 }
 
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .row-item strong {
   color: var(--text);
 }
@@ -83,6 +126,11 @@
   font-weight: 700;
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.badge-warning {
+  background: var(--warn-soft);
+  color: var(--warn-strong);
 }
 
 .empty-state {
@@ -147,6 +195,23 @@
 .auth-form {
   display: grid;
   gap: 0.9rem;
+}
+
+.auth-redirect-text {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.auth-redirect-link {
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-redirect-link:hover {
+  text-decoration: underline;
 }
 
 .auth-field {

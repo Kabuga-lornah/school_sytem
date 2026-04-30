@@ -16,15 +16,25 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from apps.users.views import ActivateAccountAPIView, RegisterSchoolAPIView
+from rest_framework_simplejwt.views import TokenRefreshView
+from apps.users.views import (
+    ActivateAccountAPIView,
+    AdminTeacherInviteAPIView,
+    ApproveTeacherAPIView,
+    ParentInviteAPIView,
+    RegisterSchoolAPIView,
+    RoleAwareTokenObtainPairView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/login/', RoleAwareTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/register-school/', RegisterSchoolAPIView.as_view(), name='register-school'),
     path('api/auth/activate-account/', ActivateAccountAPIView.as_view(), name='activate-account'),
+    path('api/admin/teachers/', AdminTeacherInviteAPIView.as_view(), name='admin-teacher-invites'),
+    path('api/admin/teachers/<int:teacher_id>/approve/', ApproveTeacherAPIView.as_view(), name='approve-teacher'),
+    path('api/school/parents/', ParentInviteAPIView.as_view(), name='school-parent-invites'),
     path('api/finance/', include('apps.finance.urls')),
     path('api/parent/', include('apps.users.urls')),
 ]

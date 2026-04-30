@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.academic.models import Result, Student
 from apps.finance.models import SchoolFees, Transaction, Wallet
@@ -10,6 +11,24 @@ class SchoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = School
         fields = ("id", "name", "email", "phone", "location", "school_code", "created_at")
+
+
+class RoleAwareTokenObtainPairSerializer(TokenObtainPairSerializer):
+    role = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        requested_role = attrs.pop("role", None)
+        data = super().validate(attrs)
+
+        if requested_role and self.user.role != requested_role:
+            raise serializers.ValidationError(
+                {"detail": f"This account belongs to the {self.user.role} portal. Please use the correct login page."}
+            )
+
+        data["role"] = self.user.role
+        data["username"] = self.user.username
+        data["display_name"] = f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username
+        return data
 
 
 class SchoolAdminRegisterSerializer(serializers.Serializer):
@@ -27,6 +46,7 @@ class SchoolAdminRegisterSerializer(serializers.Serializer):
         return value
 
     def validate_admin_email(self, value):
+        value = value.strip().lower()
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with that email already exists.")
         return value
@@ -36,15 +56,98 @@ class ActivateAccountSerializer(serializers.Serializer):
     school_code = serializers.CharField(max_length=50)
     identifier = serializers.CharField(max_length=255)
     temporary_password = serializers.CharField(write_only=True)
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     new_password = serializers.CharField(write_only=True, min_length=8)
 
 
 class ParentSummarySerializer(serializers.ModelSerializer):
     school = SchoolSerializer(read_only=True)
+    invited_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "school")
+        fields = ("id", "username", "first_name", "last_name", "email", "phone", "role", "must_change_password", "is_approved", "invited_by_name", "school")
+
+    def get_invited_by_name(self, obj):
+        if obj.invited_by_id:
+            return f"{obj.invited_by.first_name} {obj.invited_by.last_name}".strip() or obj.invited_by.username
+        return None
+
+
+class TeacherInviteSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=30)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return value
+
+    def validate_phone(self, value):
+        if User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("A user with that phone number already exists.")
+        return value
+
+
+class LearnerInviteSerializer(serializers.Serializer):
+    student_first_name = serializers.CharField(max_length=50)
+    student_last_name = serializers.CharField(max_length=50)
+    admission_number = serializers.CharField(max_length=20)
+    date_of_birth = serializers.DateField()
+    class_name = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    class_stream = serializers.CharField(max_length=10, required=False, allow_blank=True)
+
+    def validate_admission_number(self, value):
+        if Student.objects.filter(admission_number=value).exists():
+            raise serializers.ValidationError("A student with that admission number already exists.")
+        return value
+
+
+class ParentInviteSerializer(serializers.Serializer):
+    parent_email = serializers.EmailField()
+    parent_phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    parent_first_name = serializers.CharField(max_length=150)
+    parent_last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    learners = LearnerInviteSerializer(many=True)
+
+    def validate_parent_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return value
+
+    def validate_learners(self, value):
+        if not value:
+            raise serializers.ValidationError("Add at least one learner for this parent.")
+
+        admission_numbers = [learner["admission_number"] for learner in value]
+        if len(admission_numbers) != len(set(admission_numbers)):
+            raise serializers.ValidationError("Each learner must have a unique admission number.")
+
+        return value
+
+
+class StudentSummarySerializer(serializers.ModelSerializer):
+    parent = ParentSummarySerializer(read_only=True)
+    class_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Student
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "admission_number",
+            "date_of_birth",
+            "class_name",
+            "parent",
+        )
+
+    def get_class_name(self, obj):
+        return str(obj.school_class) if obj.school_class_id else None
 
 
 class ResultSummarySerializer(serializers.ModelSerializer):

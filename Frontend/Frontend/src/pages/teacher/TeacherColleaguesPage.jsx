@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import Card from '../../components/Card'
-import { approveTeacher, fetchTeachers, inviteTeacher } from '../../services/onboarding'
-import { getRoleConfig } from '../../utils/roles'
+import { fetchTeachers, inviteTeacher } from '../../services/onboarding'
 import '../../App.css'
 
 function getErrorMessage(error) {
@@ -17,21 +15,10 @@ function getErrorMessage(error) {
     return firstValue[0]
   }
 
-  return 'Teacher action failed. Please try again.'
+  return 'Teacher invite failed. Please try again.'
 }
 
-function getTeacherStatus(teacher) {
-  if (!teacher.is_approved) {
-    return 'Awaiting admin approval'
-  }
-  if (teacher.must_change_password) {
-    return 'Setup pending'
-  }
-  return 'Active'
-}
-
-function StudentsPage() {
-  const navigate = useNavigate()
+function TeacherColleaguesPage() {
   const [form, setForm] = useState({
     email: '',
     phone: '',
@@ -43,16 +30,9 @@ function StudentsPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [approvingId, setApprovingId] = useState(null)
 
   useEffect(() => {
     async function loadTeachers() {
-      const currentRole = localStorage.getItem('role') || localStorage.getItem('selected_role') || 'admin'
-      if (currentRole !== 'admin') {
-        navigate(getRoleConfig(currentRole)?.dashboardPath || '/', { replace: true })
-        return
-      }
-
       try {
         const data = await fetchTeachers()
         setTeachers(data.teachers || [])
@@ -64,7 +44,7 @@ function StudentsPage() {
     }
 
     loadTeachers()
-  }, [navigate])
+  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -88,24 +68,11 @@ function StudentsPage() {
     }
   }
 
-  async function handleApprove(teacherId) {
-    try {
-      setApprovingId(teacherId)
-      setError('')
-      const data = await approveTeacher(teacherId)
-      setTeachers((current) => current.map((teacher) => (teacher.id === teacherId ? data.teacher : teacher)))
-    } catch (requestError) {
-      setError(getErrorMessage(requestError))
-    } finally {
-      setApprovingId(null)
-    }
-  }
-
   return (
     <div className="dashboard-grid">
       <Card
-        title="Add Teachers"
-        subtitle="Admins can create teachers directly, or approve colleagues that were invited by existing teachers."
+        title="Invite Colleagues"
+        subtitle="Teachers can suggest new colleagues for the same school. The school admin must approve them before they can activate and access their dashboards."
       >
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
@@ -127,44 +94,36 @@ function StudentsPage() {
 
           {inviteResult ? (
             <div className="status-banner loading">
-              Teacher added for {inviteResult.teacher.first_name} {inviteResult.teacher.last_name}. School code: {inviteResult.school_code}. Activation key: {inviteResult.activation_key}
+              Invite sent for {inviteResult.teacher.first_name} {inviteResult.teacher.last_name}. The admin must approve this teacher before activation. School code: {inviteResult.school_code}. Activation key: {inviteResult.activation_key}
             </div>
           ) : null}
           {error ? <div className="status-banner error">{error}</div> : null}
 
           <div className="login-actions">
             <button type="submit" className="button-primary" disabled={submitting}>
-              {submitting ? 'Adding teacher...' : 'Add teacher'}
+              {submitting ? 'Sending request...' : 'Invite colleague'}
             </button>
           </div>
         </form>
       </Card>
 
       <Card
-        title="Teacher Accounts"
-        subtitle="Teachers invited by colleagues appear here for admin approval before they can activate and use the dashboard."
+        title="Invited Colleagues"
+        subtitle="These are the teachers you have personally invited. They stay pending until the school admin approves them."
       >
-        {loading ? <div className="empty-state">Loading teachers...</div> : null}
-        {!loading && teachers.length === 0 ? <div className="empty-state">No teachers have been invited yet.</div> : null}
+        {loading ? <div className="empty-state">Loading invited colleagues...</div> : null}
+        {!loading && teachers.length === 0 ? <div className="empty-state">You have not invited any colleagues yet.</div> : null}
         {!loading && teachers.length > 0 ? (
           <div className="dashboard-list">
             {teachers.map((teacher) => (
               <div key={teacher.id} className="row-item">
                 <div>
                   <strong>{teacher.first_name} {teacher.last_name}</strong>
-                  <small>
-                    {teacher.email || teacher.phone || 'No contact added'}
-                    {teacher.invited_by_name ? ` | invited by ${teacher.invited_by_name}` : ''}
-                  </small>
+                  <small>{teacher.email || teacher.phone || 'No contact added'}</small>
                 </div>
-                <div className="row-actions">
-                  <span className={`badge${teacher.is_approved ? '' : ' badge-warning'}`}>{getTeacherStatus(teacher)}</span>
-                  {!teacher.is_approved ? (
-                    <button type="button" className="button-primary button-inline" onClick={() => handleApprove(teacher.id)} disabled={approvingId === teacher.id}>
-                      {approvingId === teacher.id ? 'Approving...' : 'Approve'}
-                    </button>
-                  ) : null}
-                </div>
+                <span className={`badge${teacher.is_approved ? '' : ' badge-warning'}`}>
+                  {!teacher.is_approved ? 'Awaiting admin approval' : teacher.must_change_password ? 'Setup pending' : 'Active'}
+                </span>
               </div>
             ))}
           </div>
@@ -174,4 +133,4 @@ function StudentsPage() {
   )
 }
 
-export default StudentsPage
+export default TeacherColleaguesPage

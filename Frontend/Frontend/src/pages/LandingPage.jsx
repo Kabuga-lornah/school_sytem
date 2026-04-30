@@ -268,7 +268,7 @@ const styles = {
 const ROLES = [
   { key: 'parent', label: 'Parent Activate', icon: 'P' },
   { key: 'teacher', label: 'Teacher Activate', icon: 'T' },
-  { key: 'admin', label: 'Register School', icon: 'A' },
+  { key: 'admin', label: 'Admin Access', icon: 'A' },
 ]
 
 const KEYFRAMES = `
@@ -320,19 +320,29 @@ const KEYFRAMES = `
 
 function LandingPage() {
   const [showRoleChoices, setShowRoleChoices] = useState(false)
+  const [selectedRole, setSelectedRole] = useState(null)
   const [hoveredChip, setHoveredChip] = useState(null)
   const [primaryHover, setPrimaryHover] = useState(false)
   const navigate = useNavigate()
 
   function handleRoleStart(role) {
+    setSelectedRole(role)
+  }
+
+  function handlePrimaryRoleAction(role) {
     localStorage.setItem('selected_role', role)
 
     if (role === 'admin') {
-      navigate('/register-school')
+      navigate('/login?role=admin')
       return
     }
 
     navigate(`/activate?role=${role}`)
+  }
+
+  function handleSecondaryRoleAction(role) {
+    localStorage.setItem('selected_role', role)
+    navigate(`/login?role=${role}`)
   }
 
   return (
@@ -415,21 +425,44 @@ function LandingPage() {
             </div>
 
             {showRoleChoices && (
-              <div style={styles.chipGroup}>
-                {ROLES.map(({ key, label, icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    style={styles.chip(hoveredChip === key)}
-                    onMouseEnter={() => setHoveredChip(key)}
-                    onMouseLeave={() => setHoveredChip(null)}
-                    onClick={() => handleRoleStart(key)}
-                  >
-                    <span style={styles.chipIcon}>{icon}</span>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div style={styles.chipGroup}>
+                  {ROLES.map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      style={styles.chip(hoveredChip === key || selectedRole === key)}
+                      onMouseEnter={() => setHoveredChip(key)}
+                      onMouseLeave={() => setHoveredChip(null)}
+                      onClick={() => handleRoleStart(key)}
+                    >
+                      <span style={styles.chipIcon}>{icon}</span>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedRole ? (
+                  <div style={{ ...styles.actions, marginTop: '20px', marginBottom: 0 }}>
+                    <button
+                      type="button"
+                      className="btn-primary-hover"
+                      style={styles.btnPrimary}
+                      onClick={() => handlePrimaryRoleAction(selectedRole)}
+                    >
+                      {selectedRole === 'admin' ? 'Login' : 'Activate Account'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-link-hover"
+                      style={styles.btnLink}
+                      onClick={() => handleSecondaryRoleAction(selectedRole)}
+                    >
+                      {selectedRole === 'admin' ? 'Register School Instead' : 'Login Instead'}
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
           </section>
         </div>

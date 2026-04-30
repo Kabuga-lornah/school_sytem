@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import Card from '../components/Card'
 import ThemeToggle from '../components/ThemeToggle'
@@ -91,6 +91,13 @@ function RegisterSchoolPage() {
               Back
             </button>
           </div>
+
+          <p className="auth-redirect-text">
+            Already have an account?{' '}
+            <Link to="/login?role=admin" className="auth-redirect-link">
+              Login here
+            </Link>
+          </p>
         </form>
       </Card>
     </div>

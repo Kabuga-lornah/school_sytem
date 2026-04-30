@@ -8,14 +8,15 @@ const NAV_ITEMS = {
   ],
   admin: [
     { label: 'Dashboard', to: '/admin/dashboard' },
-    { label: 'Students', to: '/admin/students' },
+    { label: 'Teachers', to: '/admin/students' },
     { label: 'Finance', to: '/admin/finance' },
     { label: 'Analytics', to: '/admin/analytics' },
   ],
   teacher: [
     { label: 'Dashboard', to: '/teacher/dashboard' },
     { label: 'Results', to: '/teacher/results' },
-    { label: 'Students', to: '/teacher/students' },
+    { label: 'Parents', to: '/teacher/students' },
+    { label: 'Colleagues', to: '/teacher/colleagues' },
   ],
 }
 
@@ -24,12 +25,14 @@ function Navbar({ userName = 'Parent User', role = 'parent' }) {
   const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.parent
 
   function handleLogout() {
+    const loginRole = role || localStorage.getItem('selected_role') || localStorage.getItem('role') || 'parent'
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_name')
     localStorage.removeItem('role')
+    localStorage.setItem('selected_role', loginRole)
     window.dispatchEvent(new Event('auth-user-updated'))
-    navigate('/login')
+    navigate(`/login?role=${loginRole}`)
   }
 
   return (

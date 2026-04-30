@@ -33,6 +33,10 @@ class User(AbstractUser):
     )
 
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    phone = models.CharField(max_length=30, blank=True)
+    must_change_password = models.BooleanField(default=False)
+    is_approved = models.BooleanField(default=True)
+    invited_by = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='invited_users')
     school = models.ForeignKey(School, null=True, blank=True, on_delete=models.CASCADE, related_name='users')
 
     def __str__(self):
